@@ -2,10 +2,10 @@
 package nucleusrv.components
 import chisel3._
 
-class InstructionDecode extends Module {
+class InstructionDecode(implicit val config:Configs) extends Module {
   val io = IO(new Bundle {
     val id_instruction = Input(UInt(32.W))
-    val writeData = Input(UInt(32.W))
+    val writeData = Input(UInt(config.XLEN.W))
     val writeReg = Input(UInt(5.W))
     val pcAddress = Input(UInt(32.W))
     val ctl_writeEnable = Input(Bool())
@@ -25,11 +25,11 @@ class InstructionDecode extends Module {
     val mem_wb_result = Input(UInt(32.W))
     
     //Outputs
-    val immediate = Output(UInt(32.W))
+    val immediate = Output(UInt(config.XLEN.W))
     val writeRegAddress = Output(UInt(5.W))
-    val readData1 = Output(UInt(32.W))
-    val readData2 = Output(UInt(32.W))
-    val func7 = Output(UInt(1.W))
+    val readData1 = Output(UInt(config.XLEN.W))
+    val readData2 = Output(UInt(config.XLEN.W))
+    val func7 = Output(UInt(7.W))
     val func3 = Output(UInt(3.W))
     val ctl_aluSrc = Output(Bool())
     val ctl_memToReg = Output(UInt(2.W))
@@ -45,6 +45,8 @@ class InstructionDecode extends Module {
     val pcSrc = Output(Bool())
     val pcPlusOffset = Output(UInt(32.W))
     val ifid_flush = Output(Bool())
+
+    val stall = Output(Bool())
   })
 
   //Hazard Detection Unit
@@ -183,5 +185,11 @@ class InstructionDecode extends Module {
 
   io.writeRegAddress := io.id_instruction(11, 7)
   io.func3 := io.id_instruction(14, 12)
-  io.func7 := io.id_instruction(30)
+  when((io.id_instruction(6,0) === "b0110011".U) | ((io.id_instruction(6,0) === "b0010011".U) & (io.func3 === 5.U))){
+    io.func7 := io.id_instruction(31,25)
+  }.otherwise{
+    io.func7 := 0.U
+  }
+
+  io.stall := io.func7 === 1.U && (io.func3 === 4.U || io.func3 === 5.U || io.func3 === 6.U || io.func3 === 7.U)
 }
